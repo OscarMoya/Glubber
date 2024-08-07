@@ -5,10 +5,11 @@ import (
 	"encoding/json"
 	"log"
 
+	"github.com/OscarMoya/Glubber/pkg/location"
 	"github.com/OscarMoya/Glubber/pkg/model"
 )
 
-func driverSvcLoop(ctx context.Context, in <-chan *model.DriverInputMessage, out chan<- *model.DriverOutputMessage) {
+func driverSvcLoop(ctx context.Context, in <-chan *model.DriverInputMessage, out chan<- *model.DriverOutputMessage, geoService location.LocationManager) {
 	for {
 		select {
 		case <-ctx.Done():
@@ -25,15 +26,15 @@ func driverSvcLoop(ctx context.Context, in <-chan *model.DriverInputMessage, out
 			}
 
 			switch baseMessage.Type {
-			case model.DriverLocationMsg:
+			case model.DriverLocationMsgType:
 				var loc model.DriverLocationRequest
 				if err := json.Unmarshal(msg.Payload, &loc); err != nil {
 					log.Println("unmarshal driver location:", err)
 					continue
 				}
-				handleDriverLocation(backendCtx, out, loc)
+				go handleDriverLocation(backendCtx, out, msg.DriverAuth.DriverID, loc.Latitude, loc.Longitude, geoService)
 
-			case model.DriveRequestMsg:
+			case model.DriveRequestMsgType:
 				var req model.DriveRequest
 				if err := json.Unmarshal(msg.Payload, &req); err != nil {
 					log.Println("unmarshal drive request:", err)
@@ -48,8 +49,28 @@ func driverSvcLoop(ctx context.Context, in <-chan *model.DriverInputMessage, out
 	}
 }
 
-func handleDriverLocation(ctx context.Context, out chan<- *model.DriverOutputMessage, loc model.DriverLocationRequest) {
-	log.Printf("Received driver location: %+v\n", loc)
+func handleDriverLocation(ctx context.Context, out chan<- *model.DriverOutputMessage, driverID string, latitude, longitude float64, geoService location.LocationManager) {
+	err := geoService.SaveDriverLocation(ctx, driverID, latitude, longitude)
+	if err != nil {
+		log.Println("SaveDriverLocation:", err)
+		errMsg := model.DriverErrorResponse{
+			Code:   500,
+			Reason: err.Error(),
+		}
+		errMsg.Type = model.DriverErrorResponseMsgType
+		payload, err := json.Marshal(errMsg)
+		if err != nil {
+			log.Println("marshal error response:", err)
+			return
+		}
+		outMsg := &model.DriverOutputMessage{}
+		outMsg.IsError = true
+		outMsg.Payload = payload
+
+		out <- outMsg
+
+		return
+	}
 }
 
 func handleDriveRequest(ctx context.Context, out chan<- *model.DriverOutputMessage, req model.DriveRequest) {

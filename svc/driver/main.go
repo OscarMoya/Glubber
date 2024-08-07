@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"github.com/OscarMoya/Glubber/pkg/authentication"
+	"github.com/OscarMoya/Glubber/pkg/location"
 	"github.com/OscarMoya/Glubber/pkg/model"
 	"github.com/gorilla/websocket"
 )
@@ -26,10 +27,17 @@ var (
 	locationURI = fmt.Sprintf("%sws", driverURI)
 )
 
+type ServiceStatus struct {
+	Authenticator authentication.DriverAuthenticator
+	GeoService    location.LocationManager
+}
+
 func main() {
-	authentication := &authentication.JWTDriverAuthenticationService{}
+	serviceStatus := &ServiceStatus{}
+	serviceStatus.GeoService = &location.RedisLocationService{}
+	serviceStatus.Authenticator = &authentication.JWTDriverAuthenticationService{}
 	http.HandleFunc(locationURI, func(w http.ResponseWriter, r *http.Request) {
-		handleDriverConnections(w, r, authentication)
+		handleDriverConnections(w, r, serviceStatus)
 	})
 	log.Printf("HTTP server started on %s\n", serveURL)
 	err := http.ListenAndServe(serveURL, nil)
@@ -38,7 +46,7 @@ func main() {
 	}
 }
 
-func handleDriverConnections(w http.ResponseWriter, r *http.Request, authenticator authentication.DriverAuthenticator) {
+func handleDriverConnections(w http.ResponseWriter, r *http.Request, serviceStatus *ServiceStatus) {
 
 	tokenString := r.Header.Get("Authorization")
 	if tokenString == "" {
@@ -46,6 +54,7 @@ func handleDriverConnections(w http.ResponseWriter, r *http.Request, authenticat
 		return
 	}
 
+	authenticator := serviceStatus.Authenticator
 	claims, err := authenticator.ValidateDriverJWT(tokenString)
 	if err != nil {
 		http.Error(w, "Invalid token: "+err.Error(), http.StatusUnauthorized)
@@ -65,7 +74,7 @@ func handleDriverConnections(w http.ResponseWriter, r *http.Request, authenticat
 	ctx, cancel := context.WithCancel(r.Context())
 	defer cancel()
 
-	go driverSvcLoop(ctx, in, out)
+	go driverSvcLoop(ctx, in, out, serviceStatus.GeoService)
 
 	for {
 		select {
