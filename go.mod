@@ -3,6 +3,7 @@ module github.com/OscarMoya/Glubber
 go 1.21.3
 
 require (
+	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/go-redis/redis/v8 v8.11.5
 	github.com/gorilla/websocket v1.5.3
 	github.com/stretchr/testify v1.9.0
