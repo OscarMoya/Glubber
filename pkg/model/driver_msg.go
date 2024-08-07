@@ -5,10 +5,14 @@ type DriverMsgType string
 const (
 	// DriverLocationMsgType is the message type for driver location updates
 	DriverLocationMsgType DriverMsgType = "driver_location"
-	// DriveRequestMsgType is the message type for passenger ride requests
-	DriveRequestMsgType DriverMsgType = "driver_request"
+	// DriverRequestMsgType is the message type for passenger ride requests
+	DriverRequestMsgType DriverMsgType = "driver_request"
 	// DriverErrorResponseMsgType is the message type for error responses
 	DriverErrorResponseMsgType DriverMsgType = "driver_error"
+	// DriverHelloMsgType is the message type for driver hello messages
+	DriverHelloMsgType DriverMsgType = "driver_hello"
+	// DriverGoodByeMsgType is the message type for driver goodbye messages
+	DriverGoodByeMsgType DriverMsgType = "driver_goodbye"
 )
 
 type (
