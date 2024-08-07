@@ -8,7 +8,7 @@ import (
 	"github.com/OscarMoya/Glubber/pkg/model"
 )
 
-func driverSvcLoop(ctx context.Context, in <-chan []byte, out chan<- []byte) {
+func driverSvcLoop(ctx context.Context, in <-chan *model.DriverInputMessage, out chan<- *model.DriverOutputMessage) {
 	for {
 		select {
 		case <-ctx.Done():
@@ -19,15 +19,15 @@ func driverSvcLoop(ctx context.Context, in <-chan []byte, out chan<- []byte) {
 			backendCtx, cancel := context.WithCancel(ctx)
 			defer cancel()
 			var baseMessage model.BaseMessage
-			if err := json.Unmarshal(msg, &baseMessage); err != nil {
+			if err := json.Unmarshal(msg.Payload, &baseMessage); err != nil {
 				log.Println("unmarshal base message:", err)
 				continue
 			}
 
 			switch baseMessage.Type {
 			case model.DriverLocationMsg:
-				var loc model.DriverLocation
-				if err := json.Unmarshal(msg, &loc); err != nil {
+				var loc model.DriverLocationRequest
+				if err := json.Unmarshal(msg.Payload, &loc); err != nil {
 					log.Println("unmarshal driver location:", err)
 					continue
 				}
@@ -35,7 +35,7 @@ func driverSvcLoop(ctx context.Context, in <-chan []byte, out chan<- []byte) {
 
 			case model.DriveRequestMsg:
 				var req model.DriveRequest
-				if err := json.Unmarshal(msg, &req); err != nil {
+				if err := json.Unmarshal(msg.Payload, &req); err != nil {
 					log.Println("unmarshal drive request:", err)
 					continue
 				}
@@ -48,10 +48,10 @@ func driverSvcLoop(ctx context.Context, in <-chan []byte, out chan<- []byte) {
 	}
 }
 
-func handleDriverLocation(ctx context.Context, out chan<- []byte, loc model.DriverLocation) {
+func handleDriverLocation(ctx context.Context, out chan<- *model.DriverOutputMessage, loc model.DriverLocationRequest) {
 	log.Printf("Received driver location: %+v\n", loc)
 }
 
-func handleDriveRequest(ctx context.Context, out chan<- []byte, req model.DriveRequest) {
+func handleDriveRequest(ctx context.Context, out chan<- *model.DriverOutputMessage, req model.DriveRequest) {
 	log.Printf("Received drive request: %+v\n", req)
 }
