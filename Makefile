@@ -1,8 +1,8 @@
 dc_up:
-	docker-compose  -f docker-compose.redis.yaml up -d
+	docker-compose  -f docker-compose.redis.yaml -f docker-compose.pg.yaml up -d
 
 dc_down:
-	docker-compose -f docker-compose.redis.yaml down
+	docker-compose -f docker-compose.redis.yaml -f docker-compose.pg.yaml down
 
 
 

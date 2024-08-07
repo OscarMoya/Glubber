@@ -1,20 +1,20 @@
 package main
 
 import (
-	"context"
-	"fmt"
 	"log"
 	"net/http"
 
 	"github.com/OscarMoya/Glubber/pkg/authentication"
 	"github.com/OscarMoya/Glubber/pkg/location"
-	"github.com/OscarMoya/Glubber/pkg/model"
+	"github.com/OscarMoya/Glubber/pkg/pgdb"
+	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
 )
 
 const (
-	serveURL  = "localhost:8081"
-	driverURI = "v1/driver/"
+	serveURL     = "localhost:8081"
+	driverWSURI  = "ws/v1/driver"
+	drverHTTPUri = "v1/drivers"
 )
 
 var (
@@ -24,86 +24,38 @@ var (
 		},
 	}
 
-	locationURI = fmt.Sprintf("%sws", driverURI)
+	locationURI   = driverWSURI
+	mainURI       = drverHTTPUri
+	mainUriWithID = drverHTTPUri + "/{id}"
 )
 
-type ServiceStatus struct {
+type ServiceData struct {
 	Authenticator authentication.DriverAuthenticator
 	GeoService    location.LocationManager
+	PGDB          pgdb.DriverCruder
 }
 
 func main() {
-	serviceStatus := &ServiceStatus{}
+	serviceStatus := &ServiceData{}
 	serviceStatus.GeoService = &location.RedisLocationService{}
 	serviceStatus.Authenticator = &authentication.JWTDriverAuthenticationService{}
-	http.HandleFunc(locationURI, func(w http.ResponseWriter, r *http.Request) {
+	r := mux.NewRouter()
+
+	// HTTP Handlers
+	r.HandleFunc(mainURI, createDriverHandler(serviceStatus)).Methods("POST")
+	r.HandleFunc(mainURI, listDriversHandler(serviceStatus)).Methods("GET")
+	r.HandleFunc(mainUriWithID, getDriverHandler(serviceStatus)).Methods("GET")
+	r.HandleFunc(mainUriWithID, updateDriverHandler(serviceStatus)).Methods("PUT")
+	r.HandleFunc(mainUriWithID, deleteDriverHandler(serviceStatus)).Methods("DELETE")
+
+	// WebSocket Handlers
+	r.HandleFunc(locationURI, func(w http.ResponseWriter, r *http.Request) {
 		handleDriverConnections(w, r, serviceStatus)
 	})
+
 	log.Printf("HTTP server started on %s\n", serveURL)
 	err := http.ListenAndServe(serveURL, nil)
 	if err != nil {
 		log.Fatal("ListenAndServe: ", err)
-	}
-}
-
-func handleDriverConnections(w http.ResponseWriter, r *http.Request, serviceStatus *ServiceStatus) {
-
-	tokenString := r.Header.Get("Authorization")
-	if tokenString == "" {
-		http.Error(w, "Authorization header missing", http.StatusUnauthorized)
-		return
-	}
-
-	authenticator := serviceStatus.Authenticator
-	claims, err := authenticator.ValidateDriverJWT(tokenString)
-	if err != nil {
-		http.Error(w, "Invalid token: "+err.Error(), http.StatusUnauthorized)
-		return
-	}
-
-	ws, err := upgrader.Upgrade(w, r, nil)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	in := make(chan *model.DriverInputMessage, 256)
-	out := make(chan *model.DriverOutputMessage, 256)
-
-	defer ws.Close()
-
-	ctx, cancel := context.WithCancel(r.Context())
-	defer cancel()
-
-	go driverSvcLoop(ctx, in, out, serviceStatus.GeoService)
-
-	for {
-		select {
-		case <-ctx.Done():
-			log.Println("Driver service loop done")
-			return
-		case msg := <-out:
-			err := ws.WriteMessage(websocket.TextMessage, msg.Payload)
-			if err != nil {
-				// If there is an error writing to the websocket, log it and continue
-				// We may want to handle this differently in a production system
-				log.Println("write:", err)
-				continue
-			}
-		default:
-			// TODO: check message types
-			_, msg, err := ws.ReadMessage()
-			if err != nil {
-				log.Println("read:", err)
-				break
-			}
-			log.Printf("recv: %s", msg)
-
-			// TODO: Add constructor
-			driverIn := &model.DriverInputMessage{}
-			driverIn.Payload = msg
-			driverIn.DriverAuth = claims
-
-			in <- driverIn
-		}
 	}
 }
