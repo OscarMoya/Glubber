@@ -6,6 +6,8 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/OscarMoya/Glubber/pkg/authentication"
+	"github.com/OscarMoya/Glubber/pkg/model"
 	"github.com/gorilla/websocket"
 )
 
@@ -25,7 +27,10 @@ var (
 )
 
 func main() {
-	http.HandleFunc(locationURI, handleDriverConnections)
+	authentication := &authentication.JWTDriverAuthenticationService{}
+	http.HandleFunc(locationURI, func(w http.ResponseWriter, r *http.Request) {
+		handleDriverConnections(w, r, authentication)
+	})
 	log.Printf("HTTP server started on %s\n", serveURL)
 	err := http.ListenAndServe(serveURL, nil)
 	if err != nil {
@@ -33,14 +38,27 @@ func main() {
 	}
 }
 
-func handleDriverConnections(w http.ResponseWriter, r *http.Request) {
+func handleDriverConnections(w http.ResponseWriter, r *http.Request, authenticator authentication.DriverAuthenticator) {
+
+	tokenString := r.Header.Get("Authorization")
+	if tokenString == "" {
+		http.Error(w, "Authorization header missing", http.StatusUnauthorized)
+		return
+	}
+
+	claims, err := authenticator.ValidateDriverJWT(tokenString)
+	if err != nil {
+		http.Error(w, "Invalid token: "+err.Error(), http.StatusUnauthorized)
+		return
+	}
+
 	ws, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	in := make(chan []byte, 256)
-	out := make(chan []byte, 256)
+	in := make(chan *model.DriverInputMessage, 256)
+	out := make(chan *model.DriverOutputMessage, 256)
 
 	defer ws.Close()
 
@@ -55,7 +73,7 @@ func handleDriverConnections(w http.ResponseWriter, r *http.Request) {
 			log.Println("Driver service loop done")
 			return
 		case msg := <-out:
-			err := ws.WriteMessage(websocket.TextMessage, msg)
+			err := ws.WriteMessage(websocket.TextMessage, msg.Payload)
 			if err != nil {
 				// If there is an error writing to the websocket, log it and continue
 				// We may want to handle this differently in a production system
@@ -70,8 +88,13 @@ func handleDriverConnections(w http.ResponseWriter, r *http.Request) {
 				break
 			}
 			log.Printf("recv: %s", msg)
-			in <- msg
-		}
 
+			// TODO: Add constructor
+			driverIn := &model.DriverInputMessage{}
+			driverIn.Payload = msg
+			driverIn.DriverAuth = claims
+
+			in <- driverIn
+		}
 	}
 }
