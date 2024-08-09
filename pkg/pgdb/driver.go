@@ -17,18 +17,18 @@ type DriverCruder interface {
 	DeleteDriver(ctx context.Context, id int) error
 }
 
-type Database struct {
+type DriverDatabase struct {
 	Pool  *pgxpool.Pool
 	Table string
 }
 
-func NewDatabase(ctx context.Context, connectionString string, table string) (*Database, error) {
-	pool, err := pgxpool.Connect(context.Background(), connectionString)
+func NewDatabase(ctx context.Context, connectionString string, table string) (*DriverDatabase, error) {
+	pool, err := pgxpool.Connect(ctx, connectionString)
 	if err != nil {
 		return nil, err
 	}
 
-	db := &Database{
+	db := &DriverDatabase{
 		Pool:  pool,
 		Table: table,
 	}
@@ -41,7 +41,7 @@ func NewDatabase(ctx context.Context, connectionString string, table string) (*D
 	return db, nil
 }
 
-func (db *Database) createTable(ctx context.Context) error {
+func (db *DriverDatabase) createTable(ctx context.Context) error {
 	query := fmt.Sprintf(`
     CREATE TABLE IF NOT EXISTS %s (
         id SERIAL PRIMARY KEY,
@@ -51,24 +51,24 @@ func (db *Database) createTable(ctx context.Context) error {
         region VARCHAR(100),
 		status VARCHAR(50)
     );`, db.Table)
-	_, err := db.Pool.Exec(context.Background(), query)
+	_, err := db.Pool.Exec(ctx, query)
 	return err
 }
 
-func (db *Database) Close() {
+func (db *DriverDatabase) Close() {
 	db.Pool.Close()
 }
 
-func (db *Database) CreateDriver(ctx context.Context, driver *model.Driver) error {
+func (db *DriverDatabase) CreateDriver(ctx context.Context, driver *model.Driver) error {
 	query := fmt.Sprintf(`INSERT INTO %s (name, email, license_number, region, status) VALUES ($1, $2, $3, $4, $5) RETURNING id`, db.Table)
-	err := db.Pool.QueryRow(context.Background(), query, driver.Name, driver.Email, driver.LicenseNumber, driver.Region, driver.Status).Scan(&driver.ID)
+	err := db.Pool.QueryRow(ctx, query, driver.Name, driver.Email, driver.LicenseNumber, driver.Region, driver.Status).Scan(&driver.ID)
 	return err
 }
 
-func (db *Database) ListDrivers(ctx context.Context) ([]model.Driver, error) {
+func (db *DriverDatabase) ListDrivers(ctx context.Context) ([]model.Driver, error) {
 	var drivers []model.Driver
 	rows, err := db.Pool.Query(
-		context.Background(),
+		ctx,
 		fmt.Sprintf("SELECT id, name, email, license_number, region, status FROM %s", db.Table),
 	)
 	if err != nil {
@@ -87,7 +87,7 @@ func (db *Database) ListDrivers(ctx context.Context) ([]model.Driver, error) {
 	return drivers, nil
 }
 
-func (db *Database) GetDriver(ctx context.Context, id int) (*model.Driver, error) {
+func (db *DriverDatabase) GetDriver(ctx context.Context, id int) (*model.Driver, error) {
 	var driver model.Driver
 	query := fmt.Sprintf(`
 			SELECT 
@@ -96,7 +96,7 @@ func (db *Database) GetDriver(ctx context.Context, id int) (*model.Driver, error
 				%s 
 			WHERE id = $1`,
 		db.Table)
-	err := db.Pool.QueryRow(context.Background(), query, id).Scan(
+	err := db.Pool.QueryRow(ctx, query, id).Scan(
 		&driver.ID,
 		&driver.Name,
 		&driver.Email,
@@ -109,7 +109,7 @@ func (db *Database) GetDriver(ctx context.Context, id int) (*model.Driver, error
 	return &driver, nil
 }
 
-func (db *Database) UpdateDriver(ctx context.Context, driver *model.Driver) error {
+func (db *DriverDatabase) UpdateDriver(ctx context.Context, driver *model.Driver) error {
 	query := fmt.Sprintf(`
 		UPDATE 
 			%s 
@@ -118,18 +118,18 @@ func (db *Database) UpdateDriver(ctx context.Context, driver *model.Driver) erro
 		WHERE 
 			id = $6`,
 		db.Table)
-	_, err := db.Pool.Exec(context.Background(), query, driver.Name, driver.Email, driver.LicenseNumber, driver.Region, driver.Status, driver.ID)
+	_, err := db.Pool.Exec(ctx, query, driver.Name, driver.Email, driver.LicenseNumber, driver.Region, driver.Status, driver.ID)
 	return err
 }
 
-func (db *Database) DeleteDriver(ctx context.Context, id int) error {
+func (db *DriverDatabase) DeleteDriver(ctx context.Context, id int) error {
 	query := fmt.Sprintf(`DELETE FROM %s WHERE id = $1`, db.Table)
-	_, err := db.Pool.Exec(context.Background(), query, id)
+	_, err := db.Pool.Exec(ctx, query, id)
 	return err
 }
 
-func (db *Database) DeleteAllDrivers(ctx context.Context) error {
+func (db *DriverDatabase) DeleteAllDrivers(ctx context.Context) error {
 	query := fmt.Sprintf(`DELETE FROM %s`, db.Table)
-	_, err := db.Pool.Exec(context.Background(), query)
+	_, err := db.Pool.Exec(ctx, query)
 	return err
 }

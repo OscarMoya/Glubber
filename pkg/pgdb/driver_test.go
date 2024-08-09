@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func DeleteDB(db *Database) func() {
+func DeleteDB(db *DriverDatabase) func() {
 	return func() {
 		db.DeleteAllDrivers(context.Background())
 		db.Close()
