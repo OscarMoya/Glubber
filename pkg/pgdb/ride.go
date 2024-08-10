@@ -95,8 +95,8 @@ func (db *RideDatabase) GetRide(ctx context.Context, id int) (*model.Ride, error
 }
 
 func (db *RideDatabase) UpdateRide(ctx context.Context, ride *model.Ride) error {
-	query := `UPDATE rides SET passenger_id = $1, driver_id = $2, price = $3, status = $4 WHERE id = $5;`
-	_, err := db.Pool.Exec(ctx, query, ride.PassengerID, ride.DriverID, ride.Price, ride.Status, ride.ID)
+	query := `UPDATE rides SET passenger_id = $1, driver_id = $2, price = $3, status = $4 src_lat = $5 src_lon = $6 dst_lat = $7 dst_lon $8 WHERE id = $9;`
+	_, err := db.Pool.Exec(ctx, query, ride.PassengerID, ride.DriverID, ride.Price, ride.Status, ride.SrcLat, ride.SrcLon, ride.DstLat, ride.DstLon, ride.ID)
 	return err
 }
 
