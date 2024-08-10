@@ -7,6 +7,12 @@ import (
 	"github.com/IBM/sarama"
 )
 
+// Producer is the interface that wraps the basic Produce method
+type Producer interface {
+	SendMessage(ctx context.Context, topic string, key string, message []byte) error
+	Close() error
+}
+
 type SaramaKafkaProducer struct {
 	producer  sarama.AsyncProducer
 	successes chan *sarama.ProducerMessage

@@ -4,12 +4,12 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/OscarMoya/Glubber/pkg/pgdb"
+	"github.com/OscarMoya/Glubber/pkg/service"
 	"github.com/gorilla/mux"
 )
 
 type ServiceData struct {
-	PGDB *pgdb.PassengerDatabase
+	PGDB *service.PassengerDatabase
 }
 
 const (
@@ -21,7 +21,7 @@ const (
 func main() {
 
 	serviceStatus := &ServiceData{}
-	serviceStatus.PGDB = &pgdb.PassengerDatabase{}
+	serviceStatus.PGDB = &service.PassengerDatabase{}
 	r := mux.NewRouter()
 
 	// HTTP Handlers

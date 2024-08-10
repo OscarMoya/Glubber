@@ -1,4 +1,4 @@
-package pgdb
+package service
 
 import (
 	"context"
@@ -62,6 +62,7 @@ func (db *DriverDatabase) Close() {
 func (db *DriverDatabase) CreateDriver(ctx context.Context, driver *model.Driver) error {
 	query := fmt.Sprintf(`INSERT INTO %s (name, email, license_number, region, status) VALUES ($1, $2, $3, $4, $5) RETURNING id`, db.Table)
 	err := db.Pool.QueryRow(ctx, query, driver.Name, driver.Email, driver.LicenseNumber, driver.Region, driver.Status).Scan(&driver.ID)
+
 	return err
 }
 
