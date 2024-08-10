@@ -36,6 +36,30 @@ func AddKM(lat, lon, distanceKm, bearing float64) (float64, float64) {
 	return newLat, newLon
 }
 
+// CalculateDistance calculates the distance between two points specified by their latitude and longitude in degrees using haversine formula.
+func CalculateDistance(lat1, lon1, lat2, lon2 float64) float64 {
+	const R = 6371 // Radius of the Earth in kilometers
+
+	// Convert degrees to radians
+	lat1 = lat1 * math.Pi / 180
+	lon1 = lon1 * math.Pi / 180
+	lat2 = lat2 * math.Pi / 180
+	lon2 = lon2 * math.Pi / 180
+
+	// Differences
+	dlat := lat2 - lat1
+	dlon := lon2 - lon1
+
+	// Haversine formula
+	a := math.Sin(dlat/2)*math.Sin(dlat/2) +
+		math.Cos(lat1)*math.Cos(lat2)*math.Sin(dlon/2)*math.Sin(dlon/2)
+	c := 2 * math.Atan2(math.Sqrt(a), math.Sqrt(1-a))
+
+	// Distance in kilometers
+	distance := R * c
+	return distance
+}
+
 // Convert from degrees to radians
 func degreesToRadians(degrees float64) float64 {
 	return degrees * math.Pi / 180
