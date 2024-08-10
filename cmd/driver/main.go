@@ -6,7 +6,7 @@ import (
 
 	"github.com/OscarMoya/Glubber/pkg/authentication"
 	"github.com/OscarMoya/Glubber/pkg/location"
-	"github.com/OscarMoya/Glubber/pkg/pgdb"
+	"github.com/OscarMoya/Glubber/pkg/service"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
 )
@@ -32,7 +32,7 @@ var (
 type ServiceData struct {
 	Authenticator authentication.DriverAuthenticator
 	GeoService    location.LocationManager
-	PGDB          pgdb.DriverCruder
+	PGDB          service.DriverCruder
 }
 
 func main() {

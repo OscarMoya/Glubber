@@ -1,14 +1,18 @@
-package pgdb
+package service
 
 import (
 	"context"
+	"fmt"
 	"testing"
+	"time"
 
 	"github.com/OscarMoya/Glubber/pkg/model"
+	"github.com/OscarMoya/Glubber/pkg/queue"
+	"github.com/OscarMoya/Glubber/pkg/repository"
 	"github.com/stretchr/testify/require"
 )
 
-func DeleteRideDB(db *RideDatabase) func() {
+func DeleteRideDB(db *RideService) func() {
 	return func() {
 		db.DeleteAllRides(context.Background())
 		db.Close()
@@ -16,9 +20,30 @@ func DeleteRideDB(db *RideDatabase) func() {
 
 }
 
+var connectionString = "postgresql://admin:admin123@localhost:5432/glubber?sslmode=disable"
+
+func getTestOpts(table string) RideServiceOpts {
+	repo, err := repository.NewDBRepository(connectionString, table+"_events")
+	if err != nil {
+		fmt.Println("Error creating repository")
+	}
+	producer, err := queue.NewSaramaKafkaProducer([]string{"localhost:9092"})
+	if err != nil {
+		fmt.Println("Error creating producer")
+	}
+	return RideServiceOpts{
+		Repository:  repo,
+		Producer:    producer,
+		Table:       table,
+		DriverTopic: "drivers" + table,
+		DriverKey:   "driver" + table,
+	}
+
+}
+
 func TestCreateRide(t *testing.T) {
 	// Create a new database
-	db, err := NewRideDatabase(context.Background(), "postgresql://admin:admin123@localhost:5432/glubber", "rides1")
+	db, err := NewRideService(context.Background(), getTestOpts("rides1"))
 	require.NoError(t, err)
 	defer DeleteRideDB(db)()
 
@@ -33,13 +58,23 @@ func TestCreateRide(t *testing.T) {
 	require.NoError(t, err)
 	require.NotZero(t, ride.ID)
 
-	err = db.CreateRide(context.Background(), ride)
-	require.Error(t, err)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	not := db.Repository.Notifications(ctx)
+	nots := 0
+	for n := range not {
+		fmt.Printf("Notification: %v\n", n)
+		nots++
+		if nots == 1 {
+			break
+		}
+	}
+	require.Equal(t, 1, nots)
 }
 
 func TestListRides(t *testing.T) {
 	// Create a new database
-	db, err := NewRideDatabase(context.Background(), "postgresql://admin:admin123@localhost:5432/glubber", "rides2")
+	db, err := NewRideService(context.Background(), getTestOpts("rides2"))
 	require.NoError(t, err)
 	defer DeleteRideDB(db)()
 
@@ -64,16 +99,23 @@ func TestListRides(t *testing.T) {
 	err = db.CreateRide(context.Background(), ride2)
 	require.NoError(t, err)
 	require.NotZero(t, ride2.ID)
+
+	rides, err := db.ListRides(context.Background())
+	require.NoError(t, err)
+	require.Len(t, rides, 2)
+	require.Equal(t, ride.ID, rides[0].ID)
+	require.Equal(t, ride2.ID, rides[1].ID)
+
 }
 
 func TestGetRide(t *testing.T) {
 
-	db, err := NewRideDatabase(context.Background(), "postgresql://admin:admin123@localhost:5432/glubber", "rides3")
+	db, err := NewRideService(context.Background(), getTestOpts("rides3"))
 	require.NoError(t, err)
 	defer DeleteRideDB(db)()
 
 	ride := &model.Ride{
-		PassengerID: 1,
+		PassengerID: 20,
 		Price:       100,
 		Status:      "active",
 	}
@@ -91,7 +133,7 @@ func TestGetRide(t *testing.T) {
 }
 
 func TestUpdateRide(t *testing.T) {
-	db, err := NewRideDatabase(context.Background(), "postgresql://admin:admin123@localhost:5432/glubber", "rides4")
+	db, err := NewRideService(context.Background(), getTestOpts("rides4"))
 	require.NoError(t, err)
 	defer DeleteRideDB(db)()
 
@@ -118,7 +160,7 @@ func TestUpdateRide(t *testing.T) {
 }
 
 func TestDeleteRide(t *testing.T) {
-	db, err := NewRideDatabase(context.Background(), "postgresql://admin:admin123@localhost:5432/glubber", "rides5")
+	db, err := NewRideService(context.Background(), getTestOpts("rides5"))
 	require.NoError(t, err)
 	defer DeleteRideDB(db)()
 

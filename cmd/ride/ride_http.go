@@ -12,22 +12,29 @@ import (
 
 func createRideHandler(serviceData *ServiceData) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		var Ride model.Ride
-		if err := json.NewDecoder(r.Body).Decode(&Ride); err != nil {
+		var ride model.Ride
+		if err := json.NewDecoder(r.Body).Decode(&ride); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 		ctx, cancel := context.WithCancel(r.Context())
 		defer cancel()
 
-		err := serviceData.PGDB.CreateRide(ctx, &Ride)
+		ride.Status = model.RideStatusPending
+		err := serviceData.Biller.EstimateRide(&ride)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		err = serviceData.PGDB.CreateRide(ctx, &ride)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
 		w.WriteHeader(http.StatusCreated)
-		json.NewEncoder(w).Encode(Ride)
+		json.NewEncoder(w).Encode(ride)
 	}
 
 }
